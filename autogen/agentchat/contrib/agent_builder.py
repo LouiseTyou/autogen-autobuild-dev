@@ -4,7 +4,7 @@ import subprocess as sp
 import socket
 import json
 import hashlib
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Type, TypeVar
 
 
 def _config_check(config: Dict):
@@ -33,85 +33,92 @@ class AgentBuilder:
 
     online_server_name = "online"
 
+    DEFAULT_PROXY_DESCRIPTION = """A user console with a code interpreter interface.
+It can provide the code execution results. Select this player when other players provide some code that needs to be executed."""
+
+    DEFAULT_PROXY_SYS_MESSAGE = "User console with a python code interpreter interface."
+
+    DEFAULT_PROXY_AUTO_REPLY = (
+        "There is no code for me to execute. Let other participants to continue the conversation."
+    )
+
     CODING_PROMPT = """Does the following task need programming (i.e., access external API or tool by coding) to solve,
-    or coding may help the following task become easier?
+or coding may help the following task become easier?
 
-    TASK: {task}
+TASK: {task}
 
-    Hint:
-    # Answer only YES or NO.
-    """
+Hint:
+# Answer only YES or NO.
+"""
 
     AGENT_NAME_PROMPT = """To complete the following task, what positions/jobs should be set to maximize efficiency?
 
-    TASK: {task}
+TASK: {task}
 
-    Hint:
-    # Considering the effort, the position in this task should be no more than {max_agents}; less is better.
-    # These positions' name should include enough information that can help a group chat manager know when to let this position speak.
-    # The position name should be as specific as possible. For example, use "python_programmer" instead of "programmer".
-    # Do not use ambiguous position name, such as "domain expert" with no specific description of domain or "technical writer" with no description of what it should write.
-    # Each position should have a unique function and the position name should reflect this.
-    # The positions should relate to the task and significantly different in function.
-    # Add ONLY ONE programming related position if the task needs coding.
-    # Generated agent's name should follow the format of ^[a-zA-Z0-9_-]{{1,64}}$, use "_" to split words.
-    # Answer the names of those positions/jobs, separated names by commas.
-    # Only return the list of positions.
-    """
+Hint:
+# Considering the effort, the position in this task should be no more than {max_agents}; less is better.
+# These positions' name should include enough information that can help a group chat manager know when to let this position speak.
+# The position name should be as specific as possible. For example, use "python_programmer" instead of "programmer".
+# Do not use ambiguous position name, such as "domain expert" with no specific description of domain or "technical writer" with no description of what it should write.
+# Each position should have a unique function and the position name should reflect this.
+# The positions should relate to the task and significantly different in function.
+# Add ONLY ONE programming related position if the task needs coding.
+# Generated agent's name should follow the format of ^[a-zA-Z0-9_-]{{1,64}}$, use "_" to split words.
+# Answer the names of those positions/jobs, separated names by commas.
+# Only return the list of positions.
+"""
 
     AGENT_SYS_MSG_PROMPT = """Considering the following position and task:
 
-    TASK: {task}
-    POSITION: {position}
+TASK: {task}
+POSITION: {position}
 
-    Modify the following position requirement, making it more suitable for the above task and position:
+Modify the following position requirement, making it more suitable for the above task and position:
 
-    REQUIREMENT: {default_sys_msg}
+REQUIREMENT: {default_sys_msg}
 
-    Hint:
-    # Your answer should be natural, starting from "You are now in a group chat. You need to complete a task with other participants. As a ...".
-    # [IMPORTANT] You should let them reply "TERMINATE" when they think the task is completed (the user's need has actually been satisfied).
-    # The modified requirement should not contain the code interpreter skill.
-    # You should remove the related skill description when the position is not a programmer or developer.
-    # Coding skill is limited to Python.
-    # Your answer should omit the word "REQUIREMENT".
-    # People with the above position can doubt previous messages or code in the group chat (for example, if there is no
+Hint:
+# Your answer should be natural, starting from "You are now in a group chat. You need to complete a task with other participants. As a ...".
+# [IMPORTANT] You should let them reply "TERMINATE" when they think the task is completed (the user's need has actually been satisfied).
+# Coding skill is limited to Python.
+# Your answer should omit the word "REQUIREMENT".
+# People with the above position can doubt previous messages or code in the group chat (for example, if there is no
 output after executing the code) and provide a corrected answer or code.
-    # People in the above position should ask for help from the group chat manager when confused and let the manager select another participant.
-    """
+# People in the above position should ask for help from the group chat manager when confused and let the manager select another participant.
+"""
 
     AGENT_DESCRIPTION_PROMPT = """Considering the following position:
 
-    POSITION: {position}
+POSITION: {position}
 
-    What requirements should this position be satisfied?
+What requirements should this position be satisfied?
 
-    Hint:
-    # This description should include enough information that can help a group chat manager know when to let this position speak.
-    # People with the above position can doubt previous messages or code in the group chat (for example, if there is no
+Hint:
+# This description should include enough information that can help a group chat manager know when to let this position speak.
+# People with the above position can doubt previous messages or code in the group chat (for example, if there is no
 output after executing the code) and provide a corrected answer or code.
-    # Your answer should be in at most three sentences.
-    # Your answer should be natural, starting from "[POSITION's name] is a ...".
-    # Your answer should include the skills that this position should have.
-    # Your answer should not contain coding-related skills when the position is not a programmer or developer.
-    # Coding skills should be limited to Python.
-    """
+# Your answer should be in at most three sentences.
+# Your answer should be natural, starting from "[POSITION's name] is a ...".
+# Your answer should include the skills that this position should have.
+# Your answer should not contain coding-related skills when the position is not a programmer or developer.
+# Coding skills should be limited to Python.
+"""
 
     AGENT_SEARCHING_PROMPT = """Considering the following task:
 
-    TASK: {task}
+TASK: {task}
 
-    What following agents should be involved to the task?
+What following agents should be involved to the task?
 
-    AGENT LIST:
-    {agent_list}
+AGENT LIST:
+{agent_list}
 
-    Hint:
-    # You should consider if the agent's name and profile match the task.
-    # Considering the effort, you should select less then {max_agents} agents; less is better.
-    # Separate agent names by commas and use "_" instead of space. For example, Product_manager,Programmer
-    # Only return the list of agent names.
-    """
+Hint:
+# You should consider if the agent's name and profile match the task.
+# Considering the effort, you should select less then {max_agents} agents; less is better.
+# Separate agent names by commas and use "_" instead of space. For example, Product_manager,Programmer
+# Only return the list of agent names.
+"""
 
     def __init__(
         self,
@@ -341,6 +348,7 @@ output after executing the code) and provide a corrected answer or code.
         coding: Optional[bool] = None,
         code_execution_config: Optional[Dict] = None,
         use_oai_assistant: Optional[bool] = False,
+        user_proxy: Optional[autogen.ConversableAgent] = None,
         **kwargs,
     ) -> Tuple[List[autogen.ConversableAgent], Dict]:
         """
@@ -352,6 +360,7 @@ output after executing the code) and provide a corrected answer or code.
             code_execution_config: specific configs for user proxy (e.g., last_n_messages, work_dir, ...).
             default_llm_config: specific configs for LLM (e.g., config_list, seed, temperature, ...).
             use_oai_assistant: use OpenAI assistant api instead of self-constructed agent.
+            user_proxy: user proxy's class that can be used to replace the default user proxy.
 
         Returns:
             agent_list: a list of agents.
@@ -437,8 +446,19 @@ output after executing the code) and provide a corrected answer or code.
             agent_description_list.append(resp_agent_description)
 
         for name, sys_msg, description in list(zip(agent_name_list, agent_sys_msg_list, agent_description_list)):
+            enhanced_sys_msg = """You are now working in a group chat with different expert and a group chat manager.
+            Here is the members' name: {members}
+            The group chat manager will select the speaker who can speak at the current time, but if there is someone you want to talk to, you can @mention him/her with "I would like to hear the opinion from ...".
+            Here is your profile: """
+            enhanced_sys_msg = enhanced_sys_msg.format(members=agent_name_list)
+            enhanced_sys_msg += sys_msg
             agent_configs.append(
-                {"name": name, "model": self.agent_model, "system_message": sys_msg, "description": description}
+                {
+                    "name": name,
+                    "model": self.agent_model,
+                    "system_message": enhanced_sys_msg,
+                    "description": description,
+                }
             )
 
         if coding is None:
@@ -461,17 +481,18 @@ output after executing the code) and provide a corrected answer or code.
             }
         )
 
-        return self._build_agents(use_oai_assistant, **kwargs)
+        return self._build_agents(use_oai_assistant, user_proxy=user_proxy, **kwargs)
 
     def build_from_library(
         self,
         building_task: str,
         library_path_or_json: str,
         default_llm_config: Dict,
-        coding: Optional[bool] = True,
+        coding: Optional[bool] = None,
         code_execution_config: Optional[Dict] = None,
         use_oai_assistant: Optional[bool] = False,
         embedding_model: Optional[str] = None,
+        user_proxy: Optional[autogen.ConversableAgent] = None,
         **kwargs,
     ) -> Tuple[List[autogen.ConversableAgent], Dict]:
         """
@@ -489,6 +510,7 @@ output after executing the code) and provide a corrected answer or code.
             embedding_model: a Sentence-Transformers model use for embedding similarity to select agents from library.
                 if None, an openai model will be prompted to select agents. As reference, chromadb use "all-mpnet-base-
                 v2" as default.
+            user_proxy: user proxy's class that can be used to replace the default user proxy.
 
         Returns:
             agent_list: a list of agents.
@@ -604,8 +626,19 @@ output after executing the code) and provide a corrected answer or code.
             agent_sys_msg_list.append(resp_agent_sys_msg)
 
         for name, sys_msg, description in list(zip(agent_name_list, agent_sys_msg_list, agent_profile_list)):
+            enhanced_sys_msg = """You are now working in a group chat with different expert and a group chat manager.
+            Here is the members' name: {members}
+            The group chat manager will select the speaker who can speak at the current time, but if there is someone you want to talk to, you can @mention him/her with "I would like to hear the opinion from ...".
+            Here is your profile: """
+            enhanced_sys_msg = enhanced_sys_msg.format(members=agent_name_list)
+            enhanced_sys_msg += sys_msg
             agent_configs.append(
-                {"name": name, "model": self.agent_model, "system_message": sys_msg, "description": description}
+                {
+                    "name": name,
+                    "model": self.agent_model,
+                    "system_message": enhanced_sys_msg,
+                    "description": description,
+                }
             )
 
         if coding is None:
@@ -628,16 +661,17 @@ output after executing the code) and provide a corrected answer or code.
             }
         )
 
-        return self._build_agents(use_oai_assistant, **kwargs)
+        return self._build_agents(use_oai_assistant, user_proxy=user_proxy, **kwargs)
 
     def _build_agents(
-        self, use_oai_assistant: Optional[bool] = False, **kwargs
+        self, use_oai_assistant: Optional[bool] = False, user_proxy: Optional[autogen.ConversableAgent] = None, **kwargs
     ) -> Tuple[List[autogen.ConversableAgent], Dict]:
         """
         Build agents with generated configs.
 
         Args:
             use_oai_assistant: use OpenAI assistant api instead of self-constructed agent.
+            user_proxy: user proxy's class that can be used to replace the default user proxy.
 
         Returns:
             agent_list: a list of agents.
@@ -664,21 +698,17 @@ output after executing the code) and provide a corrected answer or code.
 
         if coding is True:
             print("Adding user console proxy...")
-            agent_list = (
-                [
-                    autogen.UserProxyAgent(
-                        name="User_console_and_code_interpreter",
-                        is_termination_msg=lambda x: "TERMINATE" in x.get("content"),
-                        system_message="User console with a python code interpreter interface.",
-                        description="""A user console with a code interpreter interface.
-It can provide the code execution results. Select this player when other players provide some code that needs to be executed.
-DO NOT SELECT THIS PLAYER WHEN NO CODE TO EXECUTE; IT WILL NOT ANSWER ANYTHING.""",
-                        code_execution_config=code_execution_config,
-                        human_input_mode="NEVER",
-                    )
-                ]
-                + agent_list
-            )
+            if user_proxy is None:
+                user_proxy = autogen.UserProxyAgent(
+                    name="User_console_and_code_interpreter",
+                    is_termination_msg=lambda x: "TERMINATE" in x.get("content"),
+                    system_message=self.DEFAULT_PROXY_SYS_MESSAGE,
+                    description=self.DEFAULT_PROXY_DESCRIPTION,
+                    code_execution_config=code_execution_config,
+                    human_input_mode="NEVER",
+                    default_auto_reply=self.DEFAULT_PROXY_AUTO_REPLY,
+                )
+            agent_list = [user_proxy] + agent_list
 
         return agent_list, self.cached_configs.copy()
 
