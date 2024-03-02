@@ -7,11 +7,10 @@ import tempfile
 import time
 import retry
 
-from autogen import OpenAIWrapper
-from autogen.code_utils import execute_code, extract_code
+from autogen import OpenAIWrapper, AssistantAgent, UserProxyAgent
 
 # Import the typing library for type hints
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 
 try:
     from termcolor import colored
@@ -28,13 +27,10 @@ class MetaPromptingScaffolding:
         client: OpenAIWrapper,
         llm_config: List[Dict[str, Any]],
         generator_settings: Dict[str, Any],
-        # verifier_settings: Dict[str, Any],
-        summarizer_settings: Dict[str, Any],
         error_message: str,
         final_answer_indicator: str,
-        expert_python_message: str,
         intermediate_feedback: str,
-        fresh_eyes: bool = True,
+        code_execution_config: Union[Dict, Literal[False]] = False,
         include_expert_name_in_instruction: bool = True,
         extract_output: bool = False,
         use_zero_shot_cot_in_expert_messages: bool = False,
@@ -42,18 +38,14 @@ class MetaPromptingScaffolding:
         # Set the language model
         self.client = client
         self.llm_config = llm_config
+        self.code_execution_config = code_execution_config
 
         # Set the generator and verifier parameters + summarizer parameters (optional)
         self.generator_settings = generator_settings
-        # self.verifier_settings = verifier_settings
-        self.summarizer_settings = summarizer_settings
 
         # Set the error message and final answer indicator
         self.error_message = error_message
         self.final_answer_indicator = final_answer_indicator
-
-        # Set the fresh_eyes flag
-        self.fresh_eyes = fresh_eyes
 
         # Other helper variables and constants for the model
         self.triple_quotes = '"""'
@@ -61,7 +53,6 @@ class MetaPromptingScaffolding:
         # Set the include_expert_name_in_instruction flag
         self.include_expert_name_in_instruction = include_expert_name_in_instruction
         self.extract_output = extract_output
-        self.expert_python_message = expert_python_message
         self.intermediate_feedback = intermediate_feedback
         self.use_zero_shot_cot_in_expert_messages = use_zero_shot_cot_in_expert_messages
 
@@ -84,8 +75,6 @@ class MetaPromptingScaffolding:
             # Note: Please feel free to change the number of rounds as you see fit.
             if counter == 16:
                 return prompt_or_messages
-
-            # TODO(msuzgun)[improvement]: In the future, if the total content is to long, we can use the summarizer to summarize the whole content.
 
             entire_message_log = prompt_or_messages.copy()
 
@@ -120,19 +109,13 @@ class MetaPromptingScaffolding:
                 # Step 2 (a): If we are not in the 0-shot CoT setting, check if the meta model output contains any text between triple quotes.
                 # If it does, then generate an output from the corresponding model.
                 pattern = r"Expert ((?:\w+ ?){1,5}):\n"
-                if (self.fresh_eyes) and (
-                    # f":\n{self.triple_quotes}" in meta_model_output
-                    re.search(pattern, meta_model_output)
-                ):
+                if re.search(pattern, meta_model_output):
                     # There might be multiple instructions between the triple quotes; so, split the output by the triple quotes.
                     triple_quote_splits = meta_model_output.split(self.triple_quotes)
                     # Odd indices are the instructions, even indices contain the lines preceding the instructions (indicating which model to use).
                     len_triple_quote_splits = len(triple_quote_splits)
 
                     intermediate_output = ""
-                    model_num_return_sequences = (
-                        1  # Feel free to ignore the model_num_return_sequences > 1 case for now.
-                    )
                     # Iterate over the instructions.
                     for i in range(1, len_triple_quote_splits, 2):
                         # Get the instructions for the corresponding model, as well as the line preceding the instructions (indicating which Expert to use).
@@ -151,120 +134,54 @@ class MetaPromptingScaffolding:
                             # Add "Let's think step by step." to the instruction.
                             if self.use_zero_shot_cot_in_expert_messages:
                                 model_instruction += "\n\nLet's think step by step."
+                            model_instruction += "\n\nYou have access to python code interpreter. Suggest python code block starting with '```python' and the code will be automatically executed. You can use code to solve the task or for result verification. You should always use print statement to get the value of a variable."
 
-                            # By default, we use the generator Expert to generate an output from the instructions.
-                            model_temp = self.generator_settings["temperature"]
-                            model_top_p = self.generator_settings["top_p"]
-                            model_max_tokens = self.generator_settings["max_tokens"]
+                            # Define the expert agent as instructed by the meta model
+                            expert = AssistantAgent(
+                                name=model_name,
+                                system_message='You are an AI assistant that helps people find information. Please answer the following question. Once you have determined the final answer, please present it using the format below:\n\n>> FINAL ANSWER:\n"""\n[final answer]\n"""',
+                                llm_config=self.llm_config,
+                                is_termination_msg=lambda x: x.get("content", "").find("TERMINATE") >= 0,
+                                max_consecutive_auto_reply=1,
+                            )
+                            user_proxy = UserProxyAgent(
+                                name=f"{model_name} proxy",
+                                human_input_mode="NEVER",
+                                code_execution_config=self.code_execution_config,
+                                max_consecutive_auto_reply=1,
+                                default_auto_reply="TERMINATE",
+                            )
+                            user_proxy.initiate_chat(expert, message=model_instruction, silent=True)
 
-                            current_model_message_list = [
-                                {
-                                    "role": "system",
-                                    "content": 'You are an AI assistant that helps people find information. Please answer the following question. Once you have determined the final answer, please present it using the format below:\n\n>> FINAL ANSWER:\n"""\n[final answer]\n"""',
-                                },
-                                {
-                                    "role": "user",
-                                    "content": model_instruction,
-                                },
-                            ]
+                            expert_reply = user_proxy.chat_messages[expert][1]["content"]
+                            proxy_reply = user_proxy.chat_messages[expert][2]["content"]
 
-                            if model_name == "Expert Python":
-                                current_model_message_list[-1][
-                                    "content"
-                                ] = f"{self.expert_python_message}.\n\n{current_model_message_list[-1]['content']}"
+                            if proxy_reply != "TERMINATE":
+                                # Code is suggested by the expert
+                                code_result = proxy_reply[
+                                    proxy_reply.find("Code output:") + len("Code output:") :
+                                ].strip()
+                                expert_reply += (
+                                    f"\n\nThis is the output of the code blocks when executed:\n\n{code_result}"
+                                )
+                            else:
+                                expert_reply.replace(
+                                    "FINAL ANSWER:",
+                                    f"{model_name}'s final answer:\n",
+                                )
 
                             print(
                                 colored(
-                                    f"\nCalling {model_name}... Instruction:\n",
+                                    f"\nResponse from {model_name}:\n",
                                     "yellow",
                                 )
                             )
-                            print(model_instruction)
+                            print(expert_reply)
 
-                            # Finally, read to call the corresponding model.
-                            model_outputs = self.client.create(
-                                messages=current_model_message_list,
-                                max_tokens=model_max_tokens,
-                                temperature=model_temp,
-                                top_p=model_top_p,
-                                **kwargs,
-                            )
-                            model_outputs = self.client.extract_text_or_completion_object(model_outputs)
-
-                            for _, model_output in enumerate(model_outputs):
-                                ## Special case for Expert Python
-                                if model_name == "Expert Python":
-                                    logs_all = ""
-                                    code_blocks = extract_code(model_output)
-                                    code_texts = []
-                                    for i, code_block in enumerate(code_blocks):
-                                        lang, code = code_block
-                                        # By default, the language is python
-                                        # TODO: Add code execution config
-                                        exitcode, logs, _ = execute_code(code, lang="python", use_docker=False)
-                                        logs_all += "\n" + logs
-                                        code_texts.append(code)
-                                    model_output += f"Here is the output of the code when executed:\n\n{logs_all}"
-
-                                else:
-                                    specicial_token = "* * *"
-                                    if self.extract_output:
-                                        # FIXME: Temporary fix
-                                        if specicial_token in model_output:
-                                            model_output = model_output.split(specicial_token)[1].strip()
-
-                                        if len(model_output.split(" ")) > 128:
-                                            model_output = "Solution too long. Please try again."
-                                    else:
-                                        model_output.replace(specicial_token, "")
-                                        model_output.replace(
-                                            "FINAL ANSWER:",
-                                            f"{model_name}'s final answer:\n",
-                                        )
-
-                                intermediate_output += f"{model_name}'s output:\n{self.triple_quotes}\n{model_output}\n{self.triple_quotes}"
-                                print(
-                                    colored(
-                                        f"\nResponse from {model_name}:\n",
-                                        "yellow",
-                                    )
-                                )
-                                print(model_output)
-
-                            # Remove the last two newlines.
-                            intermediate_output = intermediate_output.strip()
-
-                            # TODO(msuzgun)[improvement]: Using an additional verifier and/or summarizer might be useful here.
-                            # Feel free to ignore the following steps for now (for when model_num_return_sequences > 1).
-                            if model_num_return_sequences > 1:
-                                summarizer_prompt_or_messages = [
-                                    {
-                                        "role": "system",
-                                        "content": "You are an AI assistant that helps people find information.",
-                                    },
-                                    {
-                                        "role": "user",
-                                        "content": f"Please provide a clear and concise summary of the expert outputs, emphasizing the key similarities and differences between them.\n\nPrompt: {model_instruction}\n\nOutput: {intermediate_output}",
-                                    },
-                                ]
-
-                                # Let's call the summarizer Expert to summarize the outputs.
-                                summarizer_output = self.client.create(
-                                    messages=summarizer_prompt_or_messages,
-                                    max_tokens=self.summarizer_settings["max_tokens"],
-                                    temperature=self.summarizer_settings["temperature"],
-                                    top_p=self.summarizer_settings["top_p"],
-                                    **kwargs,
-                                )[0]
-                                summarizer_output = self.client.extract_text_or_completion_object(summarizer_output)[0]
-
-                                # Make this the new intermediate output.
-                                intermediate_output = (
-                                    f"Here is the summary of {model_name}'s outputs:\n\n{summarizer_output}"
-                                )
+                            intermediate_output = f"{model_name}'s output:\n{self.triple_quotes}\n{expert_reply}\n{self.triple_quotes}".strip()
 
                     # Add the intermediate output to the full prompt or messages.
-                    intermediate_output = f"{intermediate_output}\n\n{self.intermediate_feedback}"
+                    intermediate_output += f"\n\n{self.intermediate_feedback}"
 
                     # Add the intermediate output to the full prompt or messages.
                     entire_message_log.append(

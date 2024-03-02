@@ -1,7 +1,8 @@
 from typing import Dict, List, Optional, Union, Callable, Literal
+import warnings
 
 from autogen.agentchat.assistant_agent import ConversableAgent
-from autogen.meta_scaffolding_utils import MetaPromptingScaffolding
+from autogen.meta_scaffold_utils import MetaPromptingScaffolding
 from autogen.agentchat import Agent
 from autogen.oai.client import OpenAIWrapper
 
@@ -15,8 +16,11 @@ except ImportError:
 
 class MetaPromptAgent(ConversableAgent):
     """
-    (Experimental) An agent that uses the MetaPromptingScaffolding to generate prompts for experts and manage the conversation with them.
+    (Experimental) An agent that uses the enhanced MetaPromptingScaffolding method to generate prompts for experts and manage the conversation with them.
     This method is detailed in the paper "Meta-Prompting: Enhancing Language Models with Task-Agnostic Scaffolding" by Suzgun et al. Pdf available at https://arxiv.org/abs/2401.12954
+    The adaptations we introduced are:
+    - Every expert is equipped with the ability to generate and execute Python code.
+    - With the above enhancement, the Expert Python is no longer needed. Related prompt is removed.
     """
 
     meta_prompt_system_message = (
@@ -27,8 +31,6 @@ class MetaPromptAgent(ConversableAgent):
     error_message = 'If you have determined the final answer, please present it using the format below:\n\n>> FINAL ANSWER:\n"""\n[final answer]\n"""'
 
     final_answer_indicator = ">> FINAL ANSWER:"
-
-    expert_python_message = "You are an expert in Python and can generate Python code. To execute the code and display its output in the terminal using print statements, you should suggest python code blocks starting with ```python and ends with ```."
 
     intermediate_feedback = "Based on the information given, what are the most logical next steps or conclusions? Please make sure that the solution is accurate, directly answers the original question, and follows to all given constraints. Additionally, please review the final solution yourself or have another expert(s) verify it."
 
@@ -45,8 +47,6 @@ class MetaPromptAgent(ConversableAgent):
     """
 
     question_prefix: str = '''You are Meta-Expert, an extremely clever expert with the unique ability to collaborate with multiple experts (such as Expert Problem Solver, Expert Mathematician, Expert Essayist, etc.) to tackle any task and solve any complex problems. Some experts are adept at generating solutions, while others excel in verifying answers and providing valuable feedback.
-
-    Note that you also have special access to Expert Python, which has the unique ability to generate and execute Python code given natural-language instructions. Expert Python is highly capable of crafting code to perform complex calculations when given clear and precise directions. You might therefore want to use it especially for computational tasks.
 
     As Meta-Expert, your role is to oversee the communication between the experts, effectively using their skills to answer a given question while applying your own critical thinking and verification abilities.
 
@@ -73,7 +73,7 @@ class MetaPromptAgent(ConversableAgent):
     """
     '''
 
-    question_suffix: str = "\n\nLet's first come up with a list of experts you may want to consult for this problem and then immediately start solving it."  # "" # "\n\nLet's think step by step."
+    question_suffix: str = "\n\nLet's first come up with a list of experts you may want to consult for this problem and then immediately start solving it."
 
     # If expert prompting is enabled, the expert identity will be generated and appended, as well as the task description and input, to the prompt
     expert_prompting: bool = False
@@ -88,10 +88,9 @@ class MetaPromptAgent(ConversableAgent):
         "top_p": 0.95,
         "max_tokens": 1024,
     }
-    summarizer_settings = {
-        "temperature": 1,
-        "top_p": 0.95,
-        "max_tokens": 1024,
+    code_execution_config = {
+        "work_dir": "coding",
+        "use_docker": False,
     }
 
     def __init__(
@@ -99,26 +98,33 @@ class MetaPromptAgent(ConversableAgent):
         name,
         is_termination_msg: Optional[Callable[[Dict], bool]] = None,
         max_consecutive_auto_reply: Optional[int] = None,
-        # code_execution_config: Union[Dict, Literal[False]] = False, # For now code execution is not customizable
+        code_execution_config: Union[Dict, Literal[False]] = False,
         llm_config: Optional[Union[Dict, Literal[False]]] = None,
         default_auto_reply: Optional[Union[str, Dict, None]] = "",
     ):
+        if code_execution_config:
+            self.code_execution_config = code_execution_config
+        else:
+            warnings.warn(
+                "code_execution_config is set to False. However, code execution is required for MetaPromptAgent. Setting it to local execution."
+            )
+
         super().__init__(
             name=name,
             is_termination_msg=is_termination_msg,
             max_consecutive_auto_reply=max_consecutive_auto_reply,
             human_input_mode="NEVER",
-            # code_execution_config=False,
+            code_execution_config=self.code_execution_config,
             llm_config=llm_config,
             default_auto_reply=default_auto_reply,
         )
         self.meta_model = MetaPromptingScaffolding(
             client=self.client,
             llm_config=llm_config,
+            code_execution_config=self.code_execution_config,
             generator_settings=self.generator_settings,
             error_message=self.error_message,
             final_answer_indicator=self.final_answer_indicator,
-            expert_python_message=self.expert_python_message,
             intermediate_feedback=self.intermediate_feedback,
         )
         self.register_reply([Agent, None], MetaPromptAgent.generate_meta_prompt_reply)
