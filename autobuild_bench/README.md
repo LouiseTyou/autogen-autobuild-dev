@@ -24,7 +24,7 @@ Use following command to run the benchmark for each scenario:
 cd [SCENARIO FOLDER. For example, /path/to/scenarious/MATH]
 python Scripts/init_tasks.py  // initialize the tasks
 autogenbench run Tasks/[TASK YOU WANT TO RUN].jsonl  // run the task
-autogenbench tabulate results/[TASK YOU WANT TO RUN]  // print the results in tabulate.
+autogenbench tabulate Results/[TASK YOU WANT TO RUN]  // print the results in tabulate.
 ```
 
 If you want to debug, set `-s 1` to use a single data for testing:
@@ -35,7 +35,7 @@ autogenbench run Tasks/[TASK YOU WANT TO RUN].jsonl -s 1
 If you want to debug a specific problem, you can run the `scenario.py` in `Results/[YOUR TASK]/[PROBLEM ID]/0/scenario.py` manually in debug mode.
 
 
-Everytime the `autogenbench run TASK` will check the `Results` folder and only run the problems that are not in the `Results` folder. If you want to rerun the tasks, you need to delete the corresponding files in the `Results` folder.
+Note that everytime the `autogenbench run TASK` will check the `Results` folder and only run the problems that are not in it. If you want to rerun the tasks, you need to delete the corresponding files in the `Results` folder.
 
 
 ## Contribute
