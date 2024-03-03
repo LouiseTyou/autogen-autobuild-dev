@@ -1,7 +1,7 @@
 import json
 import autogen
 from .agent_builder import AgentBuilder
-from .meta_prompt_agent import MetaPromptAgent
+from .meta_prompting_agent_autogen import MetaPromptAgent
 from typing import Callable, Dict, List, Literal, Optional, Union
 from autogen.agentchat.conversable_agent import ConversableAgent
 

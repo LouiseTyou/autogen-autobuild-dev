@@ -78,6 +78,9 @@ It is important to note that within a single response, you are limited to initia
 Upon the completion of all tasks and verifications, you should conclude the operation and reply "TERMINATE".
 """
 
+    META_PROMPTING_SYSTEM_MESSAGE = """TODO: Add system message for meta prompting.
+    """
+
     DEFAULT_DESCRIPTION = "A helpful AI assistant that can build a group of agents at a proper time to solve a task."
 
     def __init__(
