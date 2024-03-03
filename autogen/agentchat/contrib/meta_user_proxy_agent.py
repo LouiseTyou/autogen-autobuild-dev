@@ -1,6 +1,7 @@
 import json
 import autogen
 from .agent_builder import AgentBuilder
+from .meta_prompt_agent import MetaPromptAgent
 from typing import Callable, Dict, List, Literal, Optional, Union
 from autogen.agentchat.conversable_agent import ConversableAgent
 
@@ -13,11 +14,10 @@ def check_nested_mode_config(nested_mode_config: Dict):
         assert (
             "group_chat_llm_config" in nested_mode_config.keys()
         ), "group_chat_llm_config is required when using autobuild as nested mode."
-    elif "meta_prompting_config" in nested_mode_config.keys():
-        # TODO: check meta_prompting_config
+    elif "meta_prompting_llm_config" in nested_mode_config.keys():
         pass
     else:
-        raise ValueError("nested_mode_config should contain either autobuild_init_config or meta_prompting_config.")
+        raise ValueError("nested_mode_config should contain either autobuild_init_config or meta_prompting_llm_config.")
 
 
 class MetaUserProxyAgent(ConversableAgent):
@@ -183,5 +183,28 @@ Conversation history:
         )
         return summarized_history
 
-    def _run_meta_prompting(self, **args) -> str:
-        pass
+    def _run_meta_prompting(self, task: str) -> str:
+        """
+        Run Meta-prompting to solve the task. The method is adapted from "Meta-Prompting: Enhancing Language Models with Task-Agnostic Scaffolding". pdf available at https://arxiv.org/abs/2401.12954
+        """
+        print("Running meta prompting...")
+
+        meta_agent = MetaPromptAgent(
+            name="MetaPrompt Agent",
+            is_termination_msg=lambda x: x.get("content", "") == "TERMINATE",
+            max_consecutive_auto_reply=1,
+            default_auto_reply="TERMINATE",
+            llm_config=self.nested_mode_config["meta_prompting_llm_config"],
+            code_execution_config=self._code_execution_config,
+        )
+        proxy = autogen.UserProxyAgent(
+            name="MetaPrompt Proxy",
+            is_termination_msg=lambda x: meta_agent.final_answer_indicator in x.get("content", ""),
+            max_consecutive_auto_reply=1,
+            default_auto_reply="TERMINATE",
+            code_execution_config=False,
+            human_input_mode="NEVER",
+        )
+        proxy.initiate_chat(meta_agent, message=task, silent=True)
+
+        return proxy.chat_messages[meta_agent][1]["content"]

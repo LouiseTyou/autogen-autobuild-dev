@@ -8,7 +8,19 @@ class MetaAgent(ConversableAgent):
     """
 
     # input: agent's system message
-    META_PROMPTING_TOOL = {"type": "function", "function": {"name": "meta_prompting"}}
+    META_PROMPTING_TOOL = {
+        "type": "function",
+        "function": {
+            "name": "meta_prompting",
+            "description": "Solve a task by querying a group of experts sequentially. A meta agent will decide which expert to query next based on the previous expert's response. The meta agent will return the final answer based on the conversation history.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "[REQUIRED] The task that needs to be solved."}
+                },
+            },
+        },
+    }
 
     AUTOBUILD_QUERY_TOOL = {
         "type": "function",
