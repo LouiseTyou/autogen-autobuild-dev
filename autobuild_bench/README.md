@@ -5,7 +5,14 @@ We also provided some brief instructions for `autogenbench` below.
 
 ## Installation
 
-`autogenbench` requires the latest version of `pyautogen`. You can install `pyautogen`. You can install them by running the following command:
+[Recommend] You can install pyautogen and autogenbench in editable way, which is easy to debug:
+```bash
+cd /path/to/autogen-autobuild-dev
+pip install -e .
+cd /path/to/autogen-bench-dev/samples/autogenbench
+pip install -e .
+```
+You can also install official `pyautogen` and `autogenbench` by:
 ```bash
 pip install pyautogen autogenbench
 ```
@@ -20,10 +27,16 @@ autogenbench run Tasks/[TASK YOU WANT TO RUN].jsonl  // run the task
 autogenbench tabulate results/[TASK YOU WANT TO RUN]  // print the results in tabulate.
 ```
 
-if you want to debug, set `-s 1` to use a single data for testing:
+If you want to debug, set `-s 1` to use a single data for testing:
 ```bash
 autogenbench run Tasks/[TASK YOU WANT TO RUN].jsonl -s 1
 ```
+
+If you want to debug a specific problem, you can run the `scenario.py` in `Results/[YOUR TASK]/[PROBLEM ID]/0/scenario.py` manually in debug mode.
+
+
+Everytime the `autogenbench run TASK` will check the `Results` folder and only run the problems that are not in the `Results` folder. If you want to rerun the tasks, you need to delete the corresponding files in the `Results` folder.
+
 
 ## Contribute
 
