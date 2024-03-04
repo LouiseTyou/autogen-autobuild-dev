@@ -12,11 +12,22 @@ class MetaAgent(ConversableAgent):
         "type": "function",
         "function": {
             "name": "meta_prompting",
-            "description": "Solve a task by querying a group of experts sequentially. A meta agent will decide which expert to query next based on the previous expert's response. The meta agent will return the final answer based on the conversation history.",
+            "description": "Solve a task by querying an expert. Provide the expert identity and the task that needs to be solved, and the function will return the response of the expert.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "task": {"type": "string", "description": "[REQUIRED] The task that needs to be solved."}
+                    "task": {
+                        "type": "string",
+                        "description": "[REQUIRED] The task that needs to be solved by the expert.",
+                    },
+                    "expert_name": {
+                        "type": "string",
+                        "description": "[REQUIRED] Name of the expert. Should follow the format: Expert xxx.",
+                    },
+                    "expert_identity": {
+                        "type": "string",
+                        "description": "[REQUIRED] A high-quality description about the most capable and suitable expert to answer the instruction. In second person perspective. For example, You are a linguist, well-versed in the study of language and its structures. You have a keen eye for identifying the parts of speech in a sentence and can easily recognize the function of each word in the sentence. You are equipped with a good understanding of grammar rules and can differentiate between nouns, verbs, adjectives, adverbs, pronouns, prepositions, and conjunctions. You can quickly and accurately identify the parts of speech in a sentence and explain the role of each word in the sentence. Your expertise in language and grammar is highly valuable in analyzing and understanding the nuances of communication.",
+                    },
                 },
             },
         },

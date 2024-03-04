@@ -182,28 +182,44 @@ Conversation history:
         )
         return summarized_history
 
-    def _run_meta_prompting(self, task: str) -> str:
+    def _run_meta_prompting(self, expert_name: str, expert_identity: str, task: str) -> str:
         """
         Run Meta-prompting to solve the task. The method is adapted from "Meta-Prompting: Enhancing Language Models with Task-Agnostic Scaffolding". pdf available at https://arxiv.org/abs/2401.12954
         """
         print("Running meta prompting...")
+        print("Querying expert: ", expert_name)
 
-        meta_agent = MetaPromptAgent(
-            name="MetaPrompt Agent",
-            is_termination_msg=lambda x: x.get("content", "") == "TERMINATE",
-            max_consecutive_auto_reply=1,
-            default_auto_reply="TERMINATE",
+        expert = autogen.AssistantAgent(
+            name=expert_name,
             llm_config=self.nested_mode_config["meta_prompting_llm_config"],
-            code_execution_config=self._code_execution_config,
-        )
-        proxy = autogen.UserProxyAgent(
-            name="MetaPrompt Proxy",
-            is_termination_msg=lambda x: meta_agent.final_answer_indicator in x.get("content", ""),
-            max_consecutive_auto_reply=1,
-            default_auto_reply="TERMINATE",
-            code_execution_config=False,
             human_input_mode="NEVER",
+            system_message='You are an AI assistant that helps people find information. Please answer the following question. Once you have determined the final answer, please present it using the format below:\n\n>> FINAL ANSWER:\n"""\n[final answer]\n"""',
+            max_consecutive_auto_reply=1,
         )
-        proxy.initiate_chat(meta_agent, message=task, silent=True)
+        user_proxy = autogen.UserProxyAgent(
+            name="proxy",
+            human_input_mode="NEVER",
+            default_auto_reply="TERMINATE",
+            code_execution_config={
+                "work_dir": "coding",
+                "use_docker": False,
+            },
+            max_consecutive_auto_reply=1,
+        )
+        task += "\nYou have access to python code interpreter. Suggest python code block starting with '```python' and the code will be automatically executed. You can use code to solve the task or for result verification. You should always use print statement to get the value of a variable."
+        user_proxy.initiate_chat(expert, message=expert_identity + "\n" + task, silent=True)
 
-        return proxy.chat_messages[meta_agent][1]["content"]
+        expert_reply = user_proxy.chat_messages[expert][1]["content"]
+        proxy_reply = user_proxy.chat_messages[expert][2]["content"]
+
+        if proxy_reply != "TERMINATE":
+            # Code is suggested by the expert
+            code_result = proxy_reply[proxy_reply.find("Code output:") + len("Code output:") :].strip()
+            expert_reply += f"\nThis is the output of the code blocks when executed:\n{code_result}"
+        else:
+            expert_reply.replace(
+                "FINAL ANSWER:",
+                f"{expert_name}'s final answer:\n",
+            )
+
+        return expert_reply
