@@ -421,6 +421,7 @@ def execute_code(
                 cwd=work_dir,
                 capture_output=True,
                 text=True,
+                timeout=timeout
             )
             try:
                 result = future.result(timeout=timeout)
