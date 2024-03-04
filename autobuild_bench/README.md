@@ -23,7 +23,7 @@ Use following command to run the benchmark for each scenario:
 ```bash
 cd [SCENARIO FOLDER. For example, /path/to/scenarious/MATH]
 python Scripts/init_tasks.py  // initialize the tasks
-autogenbench run Tasks/[TASK YOU WANT TO RUN].jsonl  // run the task
+autogenbench run Tasks/[TASK YOU WANT TO RUN].jsonl --native  // run the task. native is use to run the scenario without docker. If you have docker environment, you can remove it.
 autogenbench tabulate Results/[TASK YOU WANT TO RUN]  // print the results in tabulate.
 ```
 
