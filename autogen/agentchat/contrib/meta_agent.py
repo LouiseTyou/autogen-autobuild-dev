@@ -25,7 +25,7 @@ class MetaAgent(ConversableAgent):
                     },
                     "expert_identity": {
                         "type": "string",
-                        "description": "[REQUIRED] A high-quality description about the most capable and suitable expert to answer the instruction. In second person perspective. For example, You are a linguist, well-versed in the study of language and its structures. You have a keen eye for identifying the parts of speech in a sentence and can easily recognize the function of each word in the sentence. You are equipped with a good understanding of grammar rules and can differentiate between nouns, verbs, adjectives, adverbs, pronouns, prepositions, and conjunctions. You can quickly and accurately identify the parts of speech in a sentence and explain the role of each word in the sentence. Your expertise in language and grammar is highly valuable in analyzing and understanding the nuances of communication.",
+                        "description": "[REQUIRED] A high-quality description about the most capable and suitable expert to answer the instruction. In second person perspective. For example, You are a linguist, well-versed in the study of language and its structures. You are equipped with a good understanding of grammar rules and can differentiate between nouns, verbs, adjectives, adverbs, etc. You can quickly and accurately identify the parts of speech in a sentence and explain the role of each word in the sentence. Your expertise in language and grammar is highly valuable in analyzing and understanding the nuances of communication.",
                     },
                 },
             },
@@ -62,7 +62,7 @@ class MetaAgent(ConversableAgent):
                     "group_name": {"type": "string", "description": "[REQUIRED] Name of the group."},
                     "building_task": {
                         "type": "string",
-                        "description": "[REQUIRED] The building_task is an instruction that helps a build manager to build a group of experts for your task. You must describe the building_task as detailed as possible, highlight the coding and verification skills, and suggest some possible experts. Note that coding skill is useful in most situations, and building_task should also include the information of execution_task."
+                        "description": "[REQUIRED] The building_task is an instruction that helps a build manager to build a group of experts for your task. You must describe the building_task as detailed as possible, highlight the coding and verification skills, and suggest some possible experts. Note that coding skill is useful in most situations, and building_task should also include the information of execution_task.",
                     },
                     "execution_task": {
                         "type": "string",
@@ -77,7 +77,7 @@ class MetaAgent(ConversableAgent):
     AUTOBUILD_SYSTEM_MESSAGE = """You are a manager of a group of advanced experts, your primary objective is to delegate the resolution of tasks to other experts through structured dialogue and derive conclusive insights from their conversation summarization.
 When a task is assigned, it's crucial to assess its constraints and conditions for completion. If feasible, the task should be divided into smaller, logically consistent subtasks. Following this division, you have the option to address these subtasks by forming a team of agents using the "autobuild" tool.
 
-Autobuild has two tasks: building_task and execution_task. 
+Autobuild has two tasks: building_task and execution_task.
 The "building_task" is an instruction that helps a build manager to build a group of experts for your task. You must describe the building_task as detailed as possible, highlight the coding and verification part, and suggest some possible experts. Note that coding skill is useful in most situations, and building_task should also include the information of execution_task.
 The "execution_task" is a task that needs the experts to solve by conversation. It should include the problem that needs to be solved.
 
@@ -106,6 +106,7 @@ Present the final answer as follows:
 """
 [final answer]
 """
+Upon the completion of all tasks and verifications, you should conclude the operation and reply "TERMINATE".
 '''
 
     DEFAULT_DESCRIPTION = "A helpful AI assistant that can build a group of agents at a proper time to solve a task."
@@ -142,6 +143,17 @@ Present the final answer as follows:
             **kwargs (dict): Please refer to other kwargs in
                 [ConversableAgent](conversable_agent#__init__).
         """
+        super().__init__(
+            name,
+            is_termination_msg=is_termination_msg,
+            max_consecutive_auto_reply=max_consecutive_auto_reply,
+            human_input_mode=human_input_mode,
+            code_execution_config=code_execution_config,
+            llm_config=llm_config,
+            description=description,
+            **kwargs,
+        )
+
         if nested_mode == "autobuild":
             if system_message is None:
                 system_message = self.AUTOBUILD_SYSTEM_MESSAGE
@@ -154,14 +166,4 @@ Present the final answer as follows:
         else:
             raise 'Invalid nested_mode, should be "autobuild" or "meta_prompting".'
 
-        super().__init__(
-            name,
-            system_message,
-            is_termination_msg,
-            max_consecutive_auto_reply,
-            human_input_mode,
-            code_execution_config=code_execution_config,
-            llm_config=llm_config,
-            description=description,
-            **kwargs,
-        )
+        self.update_system_message(system_message)
