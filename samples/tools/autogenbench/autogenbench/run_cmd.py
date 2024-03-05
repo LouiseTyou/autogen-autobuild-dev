@@ -313,7 +313,7 @@ if [ -f scenario_init.sh ] ; then
 fi
 
 # Run the scenario
-pip install -r requirements.txt
+pip install -r /Users/elpis/llm/autogen-autobuild-dev/autobuild_bench/requirement.txt
 echo SCENARIO.PY STARTING !#!#
 timeout --preserve-status --kill-after {timeout  + 30}s {timeout}s python scenario.py
 EXIT_CODE=$?
