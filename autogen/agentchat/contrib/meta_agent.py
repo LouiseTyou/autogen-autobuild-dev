@@ -62,7 +62,7 @@ class MetaAgent(ConversableAgent):
                     "group_name": {"type": "string", "description": "[REQUIRED] Name of the group."},
                     "building_task": {
                         "type": "string",
-                        "description": "[REQUIRED] The building_task is an instruction that helps a build manager to build a group of experts for your task. You must describe the building_task as detailed as possible, highlight the coding and verification skills, and suggest some possible experts. Note that coding skill is useful in most situations, and building_task should also include the information of execution_task."
+                        "description": "[REQUIRED] The building_task is an instruction that helps a build manager to build a group of experts for your task. You must describe the building_task as detailed as possible, highlight the coding and verification skills, and suggest some possible experts. Note that coding skill is useful in most situations, and building_task should also include the information of execution_task.",
                     },
                     "execution_task": {
                         "type": "string",
@@ -77,7 +77,7 @@ class MetaAgent(ConversableAgent):
     AUTOBUILD_SYSTEM_MESSAGE = """You are a manager of a group of advanced experts, your primary objective is to delegate the resolution of tasks to other experts through structured dialogue and derive conclusive insights from their conversation summarization.
 When a task is assigned, it's crucial to assess its constraints and conditions for completion. If feasible, the task should be divided into smaller, logically consistent subtasks. Following this division, you have the option to address these subtasks by forming a team of agents using the "autobuild" tool.
 
-Autobuild has two tasks: building_task and execution_task. 
+Autobuild has two tasks: building_task and execution_task.
 The "building_task" is an instruction that helps a build manager to build a group of experts for your task. You must describe the building_task as detailed as possible, highlight the coding and verification part, and suggest some possible experts. Note that coding skill is useful in most situations, and building_task should also include the information of execution_task.
 The "execution_task" is a task that needs the experts to solve by conversation. It should include the problem that needs to be solved.
 
@@ -145,11 +145,14 @@ Present the final answer as follows:
         if nested_mode == "autobuild":
             if system_message is None:
                 system_message = self.AUTOBUILD_SYSTEM_MESSAGE
+            self.llm_config = llm_config
             self.update_tool_signature(self.AUTOBUILD_TOOL, is_remove=False)
             self.update_tool_signature(self.AUTOBUILD_QUERY_TOOL, is_remove=False)
         elif nested_mode == "meta_prompting":
             if system_message is None:
                 system_message = self.META_PROMPTING_SYSTEM_MESSAGE
+            # update tool signature requires llm_config to set first. So we set llm_config first.
+            self.llm_config = llm_config
             self.update_tool_signature(self.META_PROMPTING_TOOL, is_remove=False)
         else:
             raise 'Invalid nested_mode, should be "autobuild" or "meta_prompting".'
