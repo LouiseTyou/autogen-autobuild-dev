@@ -25,7 +25,7 @@ class MetaAgent(ConversableAgent):
                     },
                     "expert_identity": {
                         "type": "string",
-                        "description": "[REQUIRED] A high-quality description about the most capable and suitable expert to answer the instruction. In second person perspective. For example, You are a linguist, well-versed in the study of language and its structures. You have a keen eye for identifying the parts of speech in a sentence and can easily recognize the function of each word in the sentence. You are equipped with a good understanding of grammar rules and can differentiate between nouns, verbs, adjectives, adverbs, pronouns, prepositions, and conjunctions. You can quickly and accurately identify the parts of speech in a sentence and explain the role of each word in the sentence. Your expertise in language and grammar is highly valuable in analyzing and understanding the nuances of communication.",
+                        "description": "[REQUIRED] A high-quality description about the most capable and suitable expert to answer the instruction. In second person perspective. For example, You are a linguist, well-versed in the study of language and its structures. You are equipped with a good understanding of grammar rules and can differentiate between nouns, verbs, adjectives, adverbs, etc. You can quickly and accurately identify the parts of speech in a sentence and explain the role of each word in the sentence. Your expertise in language and grammar is highly valuable in analyzing and understanding the nuances of communication.",
                     },
                 },
             },
@@ -106,6 +106,7 @@ Present the final answer as follows:
 """
 [final answer]
 """
+Upon the completion of all tasks and verifications, you should conclude the operation and reply "TERMINATE".
 '''
 
     DEFAULT_DESCRIPTION = "A helpful AI assistant that can build a group of agents at a proper time to solve a task."
@@ -142,29 +143,27 @@ Present the final answer as follows:
             **kwargs (dict): Please refer to other kwargs in
                 [ConversableAgent](conversable_agent#__init__).
         """
-        if nested_mode == "autobuild":
-            if system_message is None:
-                system_message = self.AUTOBUILD_SYSTEM_MESSAGE
-            self.llm_config = llm_config
-            self.update_tool_signature(self.AUTOBUILD_TOOL, is_remove=False)
-            self.update_tool_signature(self.AUTOBUILD_QUERY_TOOL, is_remove=False)
-        elif nested_mode == "meta_prompting":
-            if system_message is None:
-                system_message = self.META_PROMPTING_SYSTEM_MESSAGE
-            # update tool signature requires llm_config to set first. So we set llm_config first.
-            self.llm_config = llm_config
-            self.update_tool_signature(self.META_PROMPTING_TOOL, is_remove=False)
-        else:
-            raise 'Invalid nested_mode, should be "autobuild" or "meta_prompting".'
-
         super().__init__(
             name,
-            system_message,
-            is_termination_msg,
-            max_consecutive_auto_reply,
-            human_input_mode,
+            is_termination_msg=is_termination_msg,
+            max_consecutive_auto_reply=max_consecutive_auto_reply,
+            human_input_mode=human_input_mode,
             code_execution_config=code_execution_config,
             llm_config=llm_config,
             description=description,
             **kwargs,
         )
+
+        if nested_mode == "autobuild":
+            if system_message is None:
+                system_message = self.AUTOBUILD_SYSTEM_MESSAGE
+            self.update_tool_signature(self.AUTOBUILD_TOOL, is_remove=False)
+            self.update_tool_signature(self.AUTOBUILD_QUERY_TOOL, is_remove=False)
+        elif nested_mode == "meta_prompting":
+            if system_message is None:
+                system_message = self.META_PROMPTING_SYSTEM_MESSAGE
+            self.update_tool_signature(self.META_PROMPTING_TOOL, is_remove=False)
+        else:
+            raise 'Invalid nested_mode, should be "autobuild" or "meta_prompting".'
+
+        self.update_system_message(system_message)
