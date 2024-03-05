@@ -130,9 +130,6 @@ class MetaPromptingScaffolding:
                     len_triple_quote_splits = len(triple_quote_splits)
 
                     intermediate_output = ""
-                    model_num_return_sequences = (
-                        1  # Feel free to ignore the model_num_return_sequences > 1 case for now.
-                    )
                     # Iterate over the instructions.
                     for i in range(1, len_triple_quote_splits, 2):
                         # Get the instructions for the corresponding model, as well as the line preceding the instructions (indicating which Expert to use).
@@ -233,35 +230,6 @@ class MetaPromptingScaffolding:
 
                             # Remove the last two newlines.
                             intermediate_output = intermediate_output.strip()
-
-                            # TODO(msuzgun)[improvement]: Using an additional verifier and/or summarizer might be useful here.
-                            # Feel free to ignore the following steps for now (for when model_num_return_sequences > 1).
-                            if model_num_return_sequences > 1:
-                                summarizer_prompt_or_messages = [
-                                    {
-                                        "role": "system",
-                                        "content": "You are an AI assistant that helps people find information.",
-                                    },
-                                    {
-                                        "role": "user",
-                                        "content": f"Please provide a clear and concise summary of the expert outputs, emphasizing the key similarities and differences between them.\n\nPrompt: {model_instruction}\n\nOutput: {intermediate_output}",
-                                    },
-                                ]
-
-                                # Let's call the summarizer Expert to summarize the outputs.
-                                summarizer_output = self.client.create(
-                                    messages=summarizer_prompt_or_messages,
-                                    max_tokens=self.summarizer_settings["max_tokens"],
-                                    temperature=self.summarizer_settings["temperature"],
-                                    top_p=self.summarizer_settings["top_p"],
-                                    **kwargs,
-                                )[0]
-                                summarizer_output = self.client.extract_text_or_completion_object(summarizer_output)[0]
-
-                                # Make this the new intermediate output.
-                                intermediate_output = (
-                                    f"Here is the summary of {model_name}'s outputs:\n\n{summarizer_output}"
-                                )
 
                     # Add the intermediate output to the full prompt or messages.
                     intermediate_output = f"{intermediate_output}\n\n{self.intermediate_feedback}"

@@ -88,11 +88,6 @@ class MetaPromptAgent(ConversableAgent):
         "top_p": 0.95,
         "max_tokens": 1024,
     }
-    summarizer_settings = {
-        "temperature": 1,
-        "top_p": 0.95,
-        "max_tokens": 1024,
-    }
 
     def __init__(
         self,
