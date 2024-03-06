@@ -15,7 +15,7 @@ with open("expected_answer.txt", "rt") as fh:
 
 
 ####################
-config_list = autogen.config_list_from_json("OAI_CONFIG_LIST")
+config_list = autogen.config_list_from_json("OAI_CONFIG_LIST", filter_dict={"model": ["gpt-4-1106"]})
 llm_config = testbed_utils.default_llm_config(config_list, timeout=180)
 
 question = """Please solve the following math problem: 
@@ -25,18 +25,14 @@ Do not plot any figure.
 Reply with the final answer in \\box{{}}."""
 
 build_manager = autogen.OpenAIWrapper(config_list=config_list)
-response_with_ans = (
-    build_manager.create(
-        messages=[
-            {
-                "role": "user",
-                "content": question.format(problem=PROMPT),
-            }
-        ]
-    )
-    .choices[0]
-    .message.content
-)
+response_with_ans = build_manager.create(
+    messages=[
+        {
+            "role": "user",
+            "content": question.format(problem=PROMPT),
+        }
+    ]
+).choices[0].message.content
 
 # ---------between "answer_checker" and "checker_proxy"---------
 # define answer checker chat
@@ -79,4 +75,4 @@ checker_proxy.initiate_chat(answer_checker, message=message_to_check)
 
 
 ####################
-testbed_utils.finalize(agents=[assistant, user_proxy, answer_checker, checker_proxy])
+testbed_utils.finalize(agents=[answer_checker, checker_proxy])
