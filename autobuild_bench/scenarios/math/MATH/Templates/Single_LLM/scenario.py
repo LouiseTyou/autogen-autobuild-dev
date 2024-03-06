@@ -21,43 +21,22 @@ llm_config = testbed_utils.default_llm_config(config_list, timeout=180)
 question = """Please solve the following math problem: 
 {problem}
 Try to approximate by python instead of exact solutions for some problems that may be difficult to calculate. 
-The following python packages are pre-installed: sympy numpy scipy
 Do not plot any figure.
-After verification, reply with the final answer in \\box{{}}."""
+Reply with the final answer in \\box{{}}."""
 
-assistant = autogen.AssistantAgent(
-    "assistant",
-    llm_config=llm_config,
-    is_termination_msg=lambda x: x.get("content", "").find("TERMINATE") >= 0,
+build_manager = autogen.OpenAIWrapper(config_list=config_list)
+response_with_ans = (
+    build_manager.create(
+        messages=[
+            {
+                "role": "user",
+                "content": question.format(problem=PROMPT),
+            }
+        ]
+    )
+    .choices[0]
+    .message.content
 )
-
-user_proxy = autogen.UserProxyAgent(
-    "user_proxy",
-    human_input_mode="NEVER",
-    is_termination_msg=lambda x: x.get("content", "").find("TERMINATE") >= 0,
-    code_execution_config={
-        "work_dir": "coding",
-        "use_docker": False,
-    },
-    max_consecutive_auto_reply=10,
-    default_auto_reply="TERMINATE",
-)
-
-user_proxy.initiate_chat(assistant, message=question.format(problem=PROMPT))
-
-
-# --------- extract reply ---------
-response_with_ans = ""
-messages = assistant._oai_messages[user_proxy]
-for j in range(len(messages) - 1, -1, -1):
-    if (
-        messages[j]["role"] == "assistant"
-        and messages[j]["content"].strip() != "TERMINATE"
-        and messages[j]["content"].strip() != "TERMINATE."
-    ):
-        response_with_ans = messages[j]["content"]
-        break
-
 
 # ---------between "answer_checker" and "checker_proxy"---------
 # define answer checker chat
