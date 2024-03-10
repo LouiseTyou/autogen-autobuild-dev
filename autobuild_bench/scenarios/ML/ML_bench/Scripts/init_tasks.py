@@ -22,22 +22,6 @@ DOWNLOADS_DIR = os.path.join(SCENARIO_DIR, "Downloads")
 
 SELECTED_PROBLEMS = [
     "MATH/test/algebra/2144.json",
-    "MATH/test/algebra/1997.json",
-    "MATH/test/algebra/2072.json",
-    "MATH/test/algebra/2137.json",
-    "MATH/test/algebra/2557.json",
-    "MATH/test/algebra/2045.json",
-    "MATH/test/algebra/2499.json",
-    "MATH/test/counting_and_probability/483.json",
-    "MATH/test/intermediate_algebra/590.json",
-    "MATH/test/prealgebra/1511.json",
-    "MATH/test/intermediate_algebra/935.json",
-    "MATH/test/prealgebra/808.json",
-    "MATH/test/number_theory/233.json",
-    "MATH/test/number_theory/960.json",
-    "MATH/test/precalculus/551.json",
-    "MATH/test/counting_and_probability/909.json",
-    "MATH/test/algebra/2417.json",
 ]
 
 

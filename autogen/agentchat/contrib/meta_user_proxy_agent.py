@@ -1,5 +1,6 @@
 import json
 import autogen
+import hashlib
 from .agent_builder import AgentBuilder
 from typing import Callable, Dict, List, Literal, Optional, Union
 from autogen.agentchat.conversable_agent import ConversableAgent
@@ -46,6 +47,7 @@ Conversation history:
         self,
         name: str,
         nested_mode_config: Dict,
+        agent_config_save_path: str = "./",
         is_termination_msg: Optional[Callable[[Dict], bool]] = None,
         max_consecutive_auto_reply: Optional[int] = None,
         human_input_mode: Optional[str] = "NEVER",
@@ -125,11 +127,12 @@ Conversation history:
             }
         )
         check_nested_mode_config(nested_mode_config)
+        self._agent_config_save_path = agent_config_save_path
         self._nested_mode_config = nested_mode_config.copy()
         self._code_execution_config = code_execution_config.copy()
         self.build_history = {}
 
-    def _run_autobuild(self, group_name: str, execution_task: str, building_task: str = "", save_path: str = None) -> str:
+    def _run_autobuild(self, group_name: str, execution_task: str, building_task: str = "") -> str:
         """
         Build a group of agents by AutoBuild to solve the task.
         This function requires the nested_mode_config to contain the autobuild_init_config,
@@ -148,8 +151,9 @@ Conversation history:
             )
             self.build_history[group_name] = agent_configs.copy()
 
-        if save_path is not None:
-            with open(f"{save_path}/build_history.json", "w") as f:
+        if self._agent_config_save_path is not None:
+            building_task_md5 = hashlib.md5(building_task.encode("utf-8")).hexdigest()
+            with open(f"{self._agent_config_save_path}/build_history_{building_task_md5}.json", "w") as f:
                 json.dump(self.build_history, f)
 
         # start nested chat
