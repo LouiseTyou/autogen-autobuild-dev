@@ -129,7 +129,7 @@ Conversation history:
         self._code_execution_config = code_execution_config.copy()
         self.build_history = {}
 
-    def _run_autobuild(self, group_name: str, execution_task: str, building_task: str = "") -> str:
+    def _run_autobuild(self, group_name: str, execution_task: str, building_task: str = "", save_path: str = None) -> str:
         """
         Build a group of agents by AutoBuild to solve the task.
         This function requires the nested_mode_config to contain the autobuild_init_config,
@@ -147,6 +147,10 @@ Conversation history:
                 building_task, **self._nested_mode_config["autobuild_build_config"]
             )
             self.build_history[group_name] = agent_configs.copy()
+
+        if save_path is not None:
+            with open(f"{save_path}/build_history.json", "w") as f:
+                json.dump(self.build_history, f)
 
         # start nested chat
         nested_group_chat = autogen.GroupChat(

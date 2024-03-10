@@ -60,6 +60,7 @@ Requirement:
     AGENT_SYS_MSG_PROMPT = """For the following TASK, write a high-quality description for the experts by modifying the DEFAULT DESCRIPTION.
 Your response should be in the second person perspective. Ensure that your instructions are clear and unambiguous, and include all necessary information within the triple quotes. You can also assign personas to the experts (e.g., "You are a [persona] specialized in...").
 All experts should equipped with python coding ability. They need coding at a proper time when solving programmatic/math/logic/complex tasks.
+You should highlight in the description that expert should print the result by using "print" function everytime when they provide codes.
 
 [TASK]: {task}
 [EXPERT]: {position}
