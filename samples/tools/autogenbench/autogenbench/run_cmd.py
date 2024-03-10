@@ -429,7 +429,7 @@ if [ -f scenario_init.sh ] ; then
 fi
 
 # Run the scenario
-pip install -r requirements.txt
+pip install -r ../../../../../../../requirement.txt
 echo SCENARIO.PY STARTING !#!#
 timeout --preserve-status --kill-after {timeout  + 30}s {timeout}s python scenario.py
 EXIT_CODE=$?
