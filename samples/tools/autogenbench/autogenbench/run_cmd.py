@@ -434,7 +434,7 @@ if [ -f scenario_init.sh ] ; then
 fi
 
 # Run the scenario
-pip install -r /autogen/autogen_bench/requirement.txt
+pip install -r /autogen/autobuild_bench/requirement.txt
 echo SCENARIO.PY STARTING !#!#
 timeout --preserve-status --kill-after {timeout  + 30}s {timeout}s python scenario.py
 EXIT_CODE=$?
