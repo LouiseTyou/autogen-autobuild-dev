@@ -71,11 +71,15 @@ def create_jsonl(name, problems, template, agent_list=None):
             task_id = item[0]
             # delete the follow row
             print(f"Converting: [{item[0]}] {task_id}")
+            if data["choices"] is None:
+                prompt_tmp = data["question"]
+            else:
+                prompt_tmp = data["question"] + 'CHOICES:' + str(data["choices"])
             record = {
                 "id": task_id,
                 "template": os.path.join(os.path.pardir, template),
                 "substitutions": {
-                    "prompt.txt": {"__PROMPT__": (data["question"] + 'CHOICES:' + str(data["choices"]))},
+                    "prompt.txt": {"__PROMPT__": prompt_tmp},
                     "expected_answer.txt": {"__ANSWER__": data["answer"]},
                     "table.txt": {"__TABLE__": (str(data['table_title']) + data["table"])},
                     "agent_list.txt": {"__AGENT_LIST__": json.dumps(agent_list)},
